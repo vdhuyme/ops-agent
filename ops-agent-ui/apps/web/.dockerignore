@@ -2,3 +2,17 @@ node_modules
 .next
 .git
 .env
+.env.local
+.env.*.local
+.turbo
+dist
+coverage
+*.log
+.DS_Store
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
+.tmp
+.vscode
+.idea

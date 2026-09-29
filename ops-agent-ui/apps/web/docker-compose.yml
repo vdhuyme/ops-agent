@@ -1,0 +1,26 @@
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3002/api/langgraph
+        NEXT_PUBLIC_ASSISTANT_ID: agent
+
+    image: ops-agent-web:latest
+    container_name: ops-agent-web
+    restart: unless-stopped
+
+    ports:
+      - "3002:3002"
+
+    environment:
+      NODE_ENV: production
+      LANGGRAPH_BACKEND_URL: http://host.docker.internal:2024
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
