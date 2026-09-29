@@ -411,7 +411,7 @@ export function Thread() {
                         <div className="flex items-center space-x-2">
                           <Switch
                             id="render-tool-calls"
-                            checked={hideToolCalls ?? false}
+                            checked={hideToolCalls}
                             onCheckedChange={setHideToolCalls}
                           />
                           <Label
