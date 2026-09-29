@@ -49,6 +49,23 @@ For more information on getting started with LangGraph Server, [see here](https:
 
 2. **Extend the graph**: The core logic of the application is defined in [graph.py](./src/agent/graph.py). You can modify this file to add new nodes, edges, or change the flow of information.
 
+## Running as a background service on Ubuntu
+
+For deployment on an Ubuntu server (no Docker), `scripts/deamon.sh` wraps the
+full lifecycle of `langgraph dev` — virtualenv setup, install, start in the
+background, stop, restart, status and logs.
+
+```bash
+./scripts/deamon.sh install   # one-time: create .venv + install deps
+./scripts/deamon.sh start     # run langgraph dev --host 0.0.0.0 as a daemon
+./scripts/deamon.sh status    # show pid + last log lines
+./scripts/deamon.sh logs      # tail -f logs/ops-agent.log
+./scripts/deamon.sh stop
+```
+
+See [scripts/README.md](scripts/README.md) for the full reference (file layout,
+how daemonization works, troubleshooting, systemd upgrade path).
+
 ## Development
 
 While iterating on your graph in LangGraph Studio, you can edit past state and rerun your app from previous states to debug specific nodes. Local changes will be automatically applied via hot reload.
