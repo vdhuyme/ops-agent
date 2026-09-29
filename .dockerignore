@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+*.egg
+
+# LangGraph runtime artifacts
+.langgraph_api/
+.langgraph_api_*/
+
+# Chroma (vector store) — tái tạo được, không cần trong image
+.chroma/
+data/
+
+# UI (Next.js / pnpm)
+ops-agent-ui/node_modules/
+ops-agent-ui/.next/
+ops-agent-ui/dist/
+ops-agent-ui/build/
+ops-agent-ui/.turbo/
+ops-agent-ui/coverage/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# IDE / tooling
+.vscode/
+.idea/
+.claude/
+.github/
+.ruff_cache/
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Tests (không cần trong runtime image)
+tests/
+
+# Docs
+README.md
+LICENSE
+Makefile
+Dockerfile
+.dockerignore
