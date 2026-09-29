@@ -7,11 +7,15 @@ RUN corepack enable \
 WORKDIR /repo
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json ./apps/web/package.json
+COPY turbo.json ./
+COPY apps ./apps
 
-RUN pnpm install --frozen-lockfile \
-      --filter ./apps/web... \
-      --ignore-scripts
+# `apps/web` declares `next` in `devDependencies`. pnpm 10+ skips devDeps
+# whenever NODE_ENV=production — including a base image's inherited value.
+# Force NODE_ENV=development here so pnpm installs devDeps for the build.
+# Builder stage flips NODE_ENV=production before `next build` itself.
+ENV NODE_ENV=development
+RUN pnpm install --lockfile --ignore-scripts
 
 FROM node:${NODE_VERSION} AS builder
 ARG NEXT_PUBLIC_API_URL
@@ -25,12 +29,15 @@ RUN corepack enable \
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /repo/apps ./apps
 
-COPY turbo.json ./
-COPY apps ./apps
+# `public/` is where Next.js looks for static assets (favicon, images...).
+# The source repo doesn't ship one, so create an empty placeholder so the
+# runner-stage COPY below has a valid source.
+RUN mkdir -p /repo/apps/web/public
 
-RUN pnpm --filter web build
+ENV NODE_ENV=production
+RUN pnpm --filter web build:internal
 
 FROM node:${NODE_VERSION} AS runner
 ENV NODE_ENV=production
@@ -40,13 +47,21 @@ ENV HOSTNAME=0.0.0.0
 
 WORKDIR /app
 
+# `.next/` is still written by Next.js into the workspace-local directory
+# (`apps/web/.next/`), NOT the monorepo root. `outputFileTracingRoot`
+# only changes which directory the file tracer scans, not where Next.js
+# emits its build output.
+#
+# Standalone preserves the workspace path structure, so `server.js` lands
+# at /app/apps/web/server.js — that's why static assets and `public/` must
+# also live under /app/apps/web/.
 COPY --from=builder /repo/apps/web/.next/standalone ./
-COPY --from=builder /repo/apps/web/.next/static  ./.next/static
-COPY --from=builder /repo/apps/web/public        ./public
+COPY --from=builder /repo/apps/web/.next/static    ./apps/web/.next/static
+COPY --from=builder /repo/apps/web/public          ./apps/web/public
 
 EXPOSE 3002
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://localhost:3002/ >/dev/null 2>&1 || exit 1
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

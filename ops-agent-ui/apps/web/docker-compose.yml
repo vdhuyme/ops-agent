@@ -4,8 +4,8 @@ services:
       context: ../..
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3002/api/langgraph
-        NEXT_PUBLIC_ASSISTANT_ID: agent
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3002/api/langgraph}
+        NEXT_PUBLIC_ASSISTANT_ID: ${NEXT_PUBLIC_ASSISTANT_ID:-agent}
 
     image: ops-agent-web:latest
     container_name: ops-agent-web
@@ -14,9 +14,11 @@ services:
     ports:
       - "3002:3002"
 
+    env_file:
+      - .env
+
     environment:
       NODE_ENV: production
-      LANGGRAPH_BACKEND_URL: http://host.docker.internal:2024
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3002/"]

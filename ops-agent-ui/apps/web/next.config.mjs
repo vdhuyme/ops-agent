@@ -1,4 +1,13 @@
 /** @type {import('next').NextConfig} */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// `apps/web/` lives two levels below the monorepo root (`ops-agent-ui/`).
+// Pointing the file tracer at the root lets Next.js discover every
+// workspace dependency (next, react, styled-jsx, ...) when building the
+// .next/standalone/ tree.
+const MONOREPO_ROOT = path.join(__dirname, "..", "..");
 
 // LangGraph backend URL — server-side only (no `NEXT_PUBLIC_` prefix), so the
 // value is never bundled into the client. Override at build/start time when
@@ -11,6 +20,7 @@ const nextConfig = {
   // Build a self-contained server bundle (`server.js` + minimal
   // `node_modules`) under `.next/standalone/`. Used by the Dockerfile.
   output: "standalone",
+  outputFileTracingRoot: MONOREPO_ROOT,
 
   // ⚠️ Disable response compression globally. Next.js's compression
   // middleware buffers the upstream body BEFORE gzipping it, which breaks
