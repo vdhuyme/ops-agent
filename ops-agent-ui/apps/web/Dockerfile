@@ -1,9 +1,14 @@
-ARG NODE_VERSION=22-alpine
+ARG NODE_VERSION=22
 ARG PNPM_VERSION=10.6.3
 
 FROM node:${NODE_VERSION} AS deps
-RUN corepack enable \
- && corepack prepare pnpm@${PNPM_VERSION} --activate
+# Install pnpm directly via npm. Corepack silently downloads a different
+# pnpm version (e.g. 12.8.1 instead of 10.6.3) on recent node base images,
+# which breaks Next.js webpack resolution of `@/*` aliases. Using a
+# Debian-based `node:22` image (not `-alpine`) avoids the pnpm/musl
+# prebuilt-binary issue that Alpine introduces.
+RUN npm install -g pnpm@${PNPM_VERSION} \
+ && pnpm --version
 WORKDIR /repo
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -24,8 +29,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_ASSISTANT_ID=${NEXT_PUBLIC_ASSISTANT_ID}
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable \
- && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN npm install -g pnpm@${PNPM_VERSION} \
+ && pnpm --version
 WORKDIR /repo
 
 COPY --from=deps /repo/node_modules ./node_modules
