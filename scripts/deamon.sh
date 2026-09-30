@@ -15,6 +15,17 @@
 
 set -euo pipefail
 
+# POSIX-only: refuse early on Windows shells (Git Bash, MSYS2, Cygwin).
+# nohup / setsid / kill -0 are not real there and the script would fail
+# with cryptic errors. Run it on Ubuntu (native, VM, or WSL).
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW*|MSYS*|CYGWIN*|Windows_NT)
+    echo "[deamon] ERROR: this script is POSIX-only (uses nohup/setsid/kill -0)." >&2
+    echo "[deamon] Detected Windows shell. Run it on Ubuntu — native, VM, or WSL." >&2
+    exit 1
+    ;;
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
