@@ -6,6 +6,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from agent.tools import tool_node, tools
+from configs import settings
 
 MAX_SEARCH_ATTEMPTS = 3
 
@@ -55,9 +56,8 @@ def _render_tools_section() -> str:
 
 
 model = ChatOllama(
-    model="qwen3.8:latest",
-    temperature=0,
-    base_url="http://192.168.1.111:11434",
+    model=settings.model_name,
+    base_url=settings.model_url,
     reasoning=False,
 ).bind_tools(tools)
 

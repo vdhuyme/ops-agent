@@ -16,8 +16,8 @@ class CoreSetting(BaseSettings):
         extra="ignore",
     )
 
-    model_name: str = "qwen3.8:latest"
-    model_url: str = "http://192.168.1.111:11434"
+    model_name: str
+    model_url: str
 
 
 settings = CoreSetting()
