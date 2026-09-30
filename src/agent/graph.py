@@ -1,124 +1,52 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Literal
+from inspect import cleandoc
 
-import chromadb
-from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
-from langchain.messages import SystemMessage
-from langchain.tools import tool
 from langchain_ollama import ChatOllama
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langgraph.graph import MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode
+from langgraph.graph import END, START, MessagesState, StateGraph
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_ROOT / "data"
-CHROMA_DIR = PROJECT_ROOT / ".chroma"
-COLLECTION_NAME = "ops_agent"
+from agent.tools import tool_node, tools
+
+MAX_SEARCH_ATTEMPTS = 3
+
 
 # ============================================================
-# Chroma
+# Tools section prompt (auto-generated from `tools`)
 # ============================================================
 
 
-chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-embedding_fn = ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
+def _render_tools_section() -> str:
+    """Sinh phần mô tả tools cho system prompt từ `tools` + docstring của từng tool."""
 
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=50,
-)
+    parts: list[str] = [
+        "# Công cụ có sẵn",
+        "",
+        "Bạn có các tool sau. Gọi tool phù hợp trước khi trả lời — không tự suy đoán.",
+        "",
+    ]
 
+    for tool_obj in tools:
+        parts.append(f"## `{tool_obj.name}`")
+        parts.append("")
+        parts.append(cleandoc(tool_obj.description or ""))
+        parts.append("")
 
-def _load_markdown_chunks() -> list[dict]:
-    """Read every .md file under DATA_DIR and split into chunks."""
-
-    if not DATA_DIR.exists():
-        raise RuntimeError(
-            f"Knowledge directory '{DATA_DIR}' does not exist. "
-            "Create it and add at least one .md file."
-        )
-
-    chunks: list[dict] = []
-
-    for path in sorted(DATA_DIR.glob("*.md")):
-        content = path.read_text(encoding="utf-8")
-        for idx, chunk in enumerate(text_splitter.split_text(content)):
-            chunks.append(
-                {
-                    "id": f"{path.name}_{idx}",
-                    "text": chunk,
-                    "source": path.name,
-                }
-            )
-
-    if not chunks:
-        raise RuntimeError(
-            f"No .md files found in {DATA_DIR}. "
-            "Add at least one markdown file to build the knowledge base."
-        )
-
-    return chunks
-
-
-def _load_collection():
-    """Return the persisted Chroma collection, building it from .md on first run."""
-
-    collection = chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=embedding_fn,
+    parts.extend(
+        [
+            "## Nguyên tắc dùng tool",
+            "",
+            "- Với câu hỏi thuộc phạm vi kiến thức → **PHẢI** gọi tool trước khi trả lời.",
+            "- **Không bao giờ** tự trả lời dựa trên kiến thức có sẵn.",
+            f"- Nếu tool trả về rỗng / không tìm thấy: hệ thống sẽ "
+            f"**TỰ ĐỘNG** yêu cầu bạn viết lại query (tối đa "
+            f"{MAX_SEARCH_ATTEMPTS} lần). Hãy thêm từ đồng nghĩa, tách câu "
+            f"đơn giản hơn rồi gọi lại — đừng bỏ cuộc sớm.",
+            "- Sau khi hết lượt retry mà vẫn không có: nói thẳng là không có "
+            "thông tin, hướng dẫn khách liên hệ tổng đài / bộ phận hỗ trợ.",
+        ]
     )
 
-    if collection.count() == 0:
-        chunks = _load_markdown_chunks()
-
-        collection.add(
-            documents=[c["text"] for c in chunks],
-            metadatas=[{"source": c["source"]} for c in chunks],
-            ids=[c["id"] for c in chunks],
-        )
-
-    return collection
-
-
-collection = _load_collection()
-
-
-# ============================================================
-# Tools
-# ============================================================
-
-
-@tool
-def search_knowledge_base(query: str) -> str:
-    """Tìm trong kho tài liệu (chính sách, FAQ, hướng dẫn, gói cước).
-
-    Dùng khi khách hỏi về chính sách, gói dịch vụ, thủ tục,
-    thời hạn hoặc bất kỳ câu hỏi nào cần tra cứu tài liệu nội bộ.
-    """
-
-    results = collection.query(query_texts=[query], n_results=10)
-
-    docs = results.get("documents", [[]])[0]
-    metas = results.get("metadatas", [[]])[0]
-
-    if not docs:
-        return f"Không tìm thấy thông tin cho: {query}"
-
-    pieces = []
-    for doc, meta in zip(docs, metas):
-        source = (meta or {}).get("source", "unknown")
-        pieces.append(f"[{source}]\n{doc}")
-
-    return "\n\n---\n\n".join(pieces)
-
-
-tools = [
-    search_knowledge_base,
-]
-
-tool_node = ToolNode(tools)
+    return "\n".join(parts)
 
 
 # ============================================================
@@ -127,9 +55,9 @@ tool_node = ToolNode(tools)
 
 
 model = ChatOllama(
-    model="qwen3.8:27b",
+    model="qwen3.8:latest",
     temperature=0,
-    base_url="http://192.168.1.90:11434",
+    base_url="http://192.168.1.111:11434",
     reasoning=False,
 ).bind_tools(tools)
 
@@ -139,7 +67,7 @@ model = ChatOllama(
 # ============================================================
 
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT_TEMPLATE = """
 # Vai trò
 
 Bạn là trợ lý chăm sóc khách hàng ảo của Công ty Cổ phần Cấp thoát nước Cần Thơ
@@ -172,15 +100,7 @@ Nếu tool không trả về kết quả phù hợp: nói thẳng là không có
 - Chào hỏi lịch sự ở tin nhắn đầu tiên của mỗi cuộc hội thoại.
 - Gọi khách là "anh/chị" nếu biết giới tính, mặc định dùng "quý khách".
 
-# Công cụ duy nhất: `search_knowledge_base`
-
-Bạn chỉ có **một tool** để tra cứu: `search_knowledge_base(query)`.
-
-- Với **bất kỳ câu hỏi nào** thuộc phạm vi kiến thức ở trên — **PHẢI** gọi tool
-  này trước khi trả lời.
-- **Không bao giờ** tự trả lời dựa trên kiến thức có sẵn.
-- Nếu tool trả về rỗng / không tìm thấy: nói thẳng là không có thông tin,
-  hướng dẫn khách liên hệ tổng đài / bộ phận hỗ trợ.
+{tools_section}
 
 # Nguyên tắc trả lời
 
@@ -201,52 +121,54 @@ Bạn chỉ có **một tool** để tra cứu: `search_knowledge_base(query)`.
 """
 
 
-def call_model(state: MessagesState):
-    messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        *state["messages"],
-    ]
+def _render_system_prompt() -> str:
+    """Render system prompt hoàn chỉnh — điền tools_section vào template."""
 
-    response = model.invoke(messages)
-
-    return {
-        "messages": [response],
-    }
+    return SYSTEM_PROMPT_TEMPLATE.format(tools_section=_render_tools_section())
 
 
 # ============================================================
-# Routing
+# State
 # ============================================================
 
 
-def should_continue(
-    state: MessagesState,
-) -> Literal["tools", "__end__"]:
-    last_message = state["messages"][-1]
+class AgentState(MessagesState):
+    """State của agent — bổ sung bộ đếm retry và cờ đánh giá kết quả search."""
 
-    if last_message.tool_calls:
-        return "tools"
-
-    return "__end__"
+    search_attempts: int = 0
+    last_search_empty: bool = False
 
 
 # ============================================================
 # Graph
 # ============================================================
 
+# Import nodes/edges ở đây (cuối file) sau khi AgentState, MAX_SEARCH_ATTEMPTS,
+# model, tools, _render_system_prompt đã được định nghĩa — tránh circular import.
+from agent.edges import route_after_tools, should_continue  # noqa: E402
+from agent.nodes import call_model, grade_search, rewrite_query  # noqa: E402
 
-workflow = StateGraph(MessagesState)
+workflow = StateGraph(AgentState)
 
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", tool_node)
+workflow.add_node("grade", grade_search)
+workflow.add_node("rewrite", rewrite_query)
 
-workflow.add_edge("__start__", "agent")
+workflow.add_edge(START, "agent")
 
 workflow.add_conditional_edges(
     "agent",
     should_continue,
+    {"tools": "tools", "__end__": END},
 )
 
-workflow.add_edge("tools", "agent")
+workflow.add_edge("tools", "grade")
+workflow.add_conditional_edges(
+    "grade",
+    route_after_tools,
+    {"rewrite": "rewrite", "agent": "agent"},
+)
+workflow.add_edge("rewrite", "agent")
 
 graph = workflow.compile()
