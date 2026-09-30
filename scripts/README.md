@@ -12,12 +12,12 @@ metal) mà không cần Docker / Kubernetes.
 
 ### Yêu cầu
 
-| Hệ thống | Phiên bản |
-|----------|-----------|
+| Hệ thống | Phiên bản                                                           |
+| -------- | ------------------------------------------------------------------- |
 | OS       | Ubuntu 22.04+ (hoặc mọi Linux có `bash`, `nohup`, `setsid`, `tail`) |
-| Python   | ≥ 3.10 (cần `python3` trên `$PATH`) |
-| `uv`     | _optional_ — nếu có sẽ được dùng thay cho `pip` (xem bên dưới) |
-| `pip`    | _optional_ — chỉ cần khi không có `uv` |
+| Python   | ≥ 3.10 (cần `python3` trên `$PATH`)                                 |
+| `uv`     | _optional_ — nếu có sẽ được dùng thay cho `pip` (xem bên dưới)      |
+| `pip`    | _optional_ — chỉ cần khi không có `uv`                              |
 
 > Script **không chạy** trên Windows (POSIX-only vì dùng `nohup`, `setsid`,
 > `kill -0`, …). Trên máy dev Windows vẫn có thể `git pull` script về nhưng hãy
@@ -26,6 +26,9 @@ metal) mà không cần Docker / Kubernetes.
 ### Cách dùng nhanh
 
 ```bash
+# 0. Lần đầu sau khi clone / pull: cấp quyền exec cho script
+chmod +x scripts/deamon.sh
+
 # 1. Lần đầu tiên trên một máy mới: tạo .venv + cài deps
 ./scripts/deamon.sh install
 
@@ -47,14 +50,14 @@ metal) mà không cần Docker / Kubernetes.
 
 ### Các action
 
-| Action   | Mô tả |
-|----------|-------|
-| `install` | Tạo `.venv/` nếu chưa có, sau đó cài project + dev deps (chứa `langgraph-cli[inmem]`). Idempotent — chạy nhiều lần không sao. |
+| Action    | Mô tả                                                                                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `install` | Tạo `.venv/` nếu chưa có, sau đó cài project + dev deps (chứa `langgraph-cli[inmem]`). Idempotent — chạy nhiều lần không sao.                               |
 | `start`   | Chạy `langgraph dev --host 0.0.0.0` nền. Nếu đã chạy thì báo và thoát. Nếu process chết trong vòng 1 giây sau khi start thì dump 50 dòng log cuối để debug. |
-| `stop`    | Gửi `SIGTERM`, đợi tối đa 30 giây, nếu vẫn sống thì `SIGKILL`. Xoá PID file. |
-| `restart` | `stop` rồi `start`. |
-| `status`  | In PID (nếu đang chạy) + 20 dòng log cuối. |
-| `logs`    | `tail -f` log file. |
+| `stop`    | Gửi `SIGTERM`, đợi tối đa 30 giây, nếu vẫn sống thì `SIGKILL`. Xoá PID file.                                                                                |
+| `restart` | `stop` rồi `start`.                                                                                                                                         |
+| `status`  | In PID (nếu đang chạy) + 20 dòng log cuối.                                                                                                                  |
+| `logs`    | `tail -f` log file.                                                                                                                                         |
 
 Nếu không truyền action thì mặc định là `status`.
 
@@ -63,12 +66,12 @@ Nếu không truyền action thì mặc định là `status`.
 Script **tự detect** đường dẫn từ vị trí của nó, nên không cần sửa gì khi copy
 repo sang máy khác. Các đường dẫn mặc định (tính tương đối từ thư mục project):
 
-| Đường dẫn | Vai trò |
-|-----------|---------|
-| `.venv/` | Virtualenv Python. |
-| `.run/ops-agent.pid` | PID của process `langgraph dev`. |
+| Đường dẫn            | Vai trò                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `.venv/`             | Virtualenv Python.                                                                                                         |
+| `.run/ops-agent.pid` | PID của process `langgraph dev`.                                                                                           |
 | `logs/ops-agent.log` | Toàn bộ stdout + stderr của backend. **Được truncate mỗi lần `start`** — nếu cần giữ log cũ thì copy đi trước khi restart. |
-| `.env` | Biến môi trường (do `langgraph.json` chỉ định) — phải tồn tại trước khi `start`. |
+| `.env`               | Biến môi trường (do `langgraph.json` chỉ định) — phải tồn tại trước khi `start`.                                           |
 
 Cả `.run/` và `logs/` được `mkdir -p` tự động ở mọi action.
 
@@ -113,7 +116,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 **`./scripts/deamon.sh: Permission denied`**
 
-Script chưa có quyền exec. Chạy một lần:
+Script chưa có quyền exec. Chạy một lần rồi thử lại:
 
 ```bash
 chmod +x scripts/deamon.sh
@@ -142,12 +145,12 @@ tail -n 200 logs/ops-agent.log
 
 Nguyên nhân thường gặp:
 
-| Triệu chứng trong log | Nguyên nhân / cách xử lý |
-|----------------------|--------------------------|
+| Triệu chứng trong log                              | Nguyên nhân / cách xử lý                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------- |
 | `ModuleNotFoundError: No module named 'langgraph'` | Chưa chạy `install`, hoặc venv bị xoá. Chạy `./scripts/deamon.sh install`. |
-| `OSError: [Errno 98] address already in use` | Port 2023 đang bị chiếm (xem mục trên). |
-| Lỗi liên quan tới Postgres / checkpoint | Kiểm tra `POSTGRES_URI` (hoặc các biến DB) trong `.env`. |
-| `Connection refused` tới Ollama ở `192.168.1.90` | Ollama chưa chạy, hoặc firewall chặn — xem [[project_ops_agent]]. |
+| `OSError: [Errno 98] address already in use`       | Port 2023 đang bị chiếm (xem mục trên).                                    |
+| Lỗi liên quan tới Postgres / checkpoint            | Kiểm tra `POSTGRES_URI` (hoặc các biến DB) trong `.env`.                   |
+| `Connection refused` tới Ollama ở `192.168.1.90`   | Ollama chưa chạy, hoặc firewall chặn — xem [[project_ops_agent]].          |
 
 **Lỗi `python3: command not found`**
 
