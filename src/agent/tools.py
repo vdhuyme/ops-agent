@@ -100,7 +100,7 @@ def search_knowledge_base(query: str) -> str:
     thời hạn hoặc bất kỳ câu hỏi nào cần tra cứu tài liệu nội bộ.
     """
 
-    results = collection.query(query_texts=[query], n_results=2)
+    results = collection.query(query_texts=[query], n_results=5)
 
     docs = results.get("documents", [[]])[0]
     metas = results.get("metadatas", [[]])[0]
