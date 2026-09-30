@@ -1,0 +1,29 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    ports:
+      - "11435:8000"
+    ipc: host
+    gpus: all
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    command:
+      - "Qwen/Qwen3-8B-AWQ"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--dtype"
+      - "half"
+      - "--quantization"
+      - "awq_marlin"
+      - "--gpu-memory-utilization"
+      - "0.85"
+      - "--max-model-len"
+      - "8192"
+      - "--max-num-seqs"
+      - "16"
+
+volumes:
+  hf-cache:
