@@ -6,6 +6,7 @@ system prompt bởi `_render_tools_section` trong `agent.graph`.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import chromadb
@@ -14,13 +15,15 @@ from langchain.tools import tool
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.prebuilt import ToolNode
 
+logger = logging.getLogger(__name__)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DIR = PROJECT_ROOT / ".chroma"
 COLLECTION_NAME = "ops_agent"
 
 # ============================================================
-# Chroma
+# Chroma — client/embedding init ở module level (fast, không có data load)
 # ============================================================
 
 
@@ -64,27 +67,34 @@ def _load_markdown_chunks() -> list[dict]:
     return chunks
 
 
-def _load_collection():
-    """Return the persisted Chroma collection, building it from .md on first run."""
+# Lazy-load collection — chỉ build khi tool được gọi lần đầu.
+# Tránh fail ngay lúc import nếu data/ rỗng, và giảm startup time.
+_collection = None
 
-    collection = chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=embedding_fn,
-    )
 
-    if collection.count() == 0:
-        chunks = _load_markdown_chunks()
+def _get_collection():
+    """Lazy-init Chroma collection (build từ .md nếu lần đầu)."""
 
-        collection.add(
-            documents=[c["text"] for c in chunks],
-            metadatas=[{"source": c["source"]} for c in chunks],
-            ids=[c["id"] for c in chunks],
+    global _collection
+
+    if _collection is None:
+        logger.info("Initializing Chroma collection '%s'...", COLLECTION_NAME)
+
+        _collection = chroma_client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=embedding_fn,
         )
 
-    return collection
+        if _collection.count() == 0:
+            chunks = _load_markdown_chunks()
+            _collection.add(
+                documents=[c["text"] for c in chunks],
+                metadatas=[{"source": c["source"]} for c in chunks],
+                ids=[c["id"] for c in chunks],
+            )
+            logger.info("Loaded %d chunks into collection.", len(chunks))
 
-
-collection = _load_collection()
+    return _collection
 
 
 # ============================================================
@@ -100,7 +110,12 @@ def search_knowledge_base(query: str) -> str:
     thời hạn hoặc bất kỳ câu hỏi nào cần tra cứu tài liệu nội bộ.
     """
 
-    results = collection.query(query_texts=[query], n_results=5)
+    try:
+        collection = _get_collection()
+        results = collection.query(query_texts=[query], n_results=5)
+    except Exception as e:
+        logger.exception("Chroma query failed for query=%r", query)
+        return f"Lỗi truy vấn knowledge base: {e}"
 
     docs = results.get("documents", [[]])[0]
     metas = results.get("metadatas", [[]])[0]

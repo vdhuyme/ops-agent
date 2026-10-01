@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 from inspect import cleandoc
 
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from agent.tools import tool_node, tools
-from configs import settings
+from configs import agent_settings, ollama_settings
 
-MAX_SEARCH_ATTEMPTS = 3
+logger = logging.getLogger(__name__)
+
+MAX_SEARCH_ATTEMPTS = agent_settings.max_search_attempts
 
 
 # ============================================================
@@ -56,8 +59,8 @@ def _render_tools_section() -> str:
 
 
 model = ChatOllama(
-    model=settings.model_name,
-    base_url=settings.model_url,
+    model=ollama_settings.model_name,
+    base_url=ollama_settings.model_url,
     reasoning=False,
 ).bind_tools(tools)
 
@@ -160,7 +163,7 @@ workflow.add_edge(START, "agent")
 workflow.add_conditional_edges(
     "agent",
     should_continue,
-    {"tools": "tools", "__end__": END},
+    {"tools": "tools", END: END},
 )
 
 workflow.add_edge("tools", "grade")
@@ -172,3 +175,9 @@ workflow.add_conditional_edges(
 workflow.add_edge("rewrite", "agent")
 
 graph = workflow.compile()
+
+logger.info(
+    "Graph compiled: model=%s max_search_attempts=%d",
+    ollama_settings.model_name,
+    MAX_SEARCH_ATTEMPTS,
+)

@@ -19,7 +19,8 @@ You can extend this graph to orchestrate more complex agentic workflows that can
 
 ```bash
 cd path/to/your/app
-pip install -e . "langgraph-cli[inmem]"
+uv sync
+uv pip install -e . "langgraph-cli[inmem]"
 ```
 
 2. (Optional) Customize the code and project as needed. Create a `.env` file if you need to use secrets.
